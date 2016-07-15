@@ -113,6 +113,7 @@ public class SweepCommand extends SingleBackendCommand {
 
             while (startRow.isPresent()) {
                 Stopwatch watch = Stopwatch.createStarted();
+                System.out.println(String.format("Attempting to sweep from %s in table %s.", encodeStartRow(startRow), table));
                 SweepResults results = sweepRunner.run(table, batchSize, startRow.get());
                 System.out.println(String.format("Swept from %s to %s in table %s in %d ms, examined %d unique cells, deleted %d cells.",
                         encodeStartRow(startRow), encodeEndRow(results.getNextStartRow()),
