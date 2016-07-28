@@ -131,10 +131,9 @@ abstract public class AbstractCassandraLockTest {
         }
     }
 
-    @Ignore
     @Test
     public void testCreatingMultipleTablesAtOnce() throws InterruptedException {
-        int threadCount = 2;
+        int threadCount = 20;
         CyclicBarrier barrier = new CyclicBarrier(threadCount);
         ForkJoinPool threadPool = new ForkJoinPool(threadCount);
 
@@ -153,7 +152,7 @@ abstract public class AbstractCassandraLockTest {
 
         try {
             threadPool.shutdown();
-            threadPool.awaitTermination(5L, TimeUnit.MINUTES);
+            threadPool.awaitTermination(2L, TimeUnit.MINUTES);
         } finally {
             slowTimeoutKvs.dropTable(GOOD_TABLE);
             assertThat(successes.get(), is(threadCount));

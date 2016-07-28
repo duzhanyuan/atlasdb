@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
@@ -1127,8 +1128,8 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
      */
     @Override
     public void createTables(final Map<TableReference, byte[]> tableNamesToTableMetadata) {
-        long lockId = waitForSchemaMutationLock();
-        System.out.println("Got lockId " + lockId);
+//        long lockId = waitForSchemaMutationLock();
+//        System.out.println("Got lockId " + lockId);
 
         try {
             clientPool.runWithRetry(new FunctionCheckedException<Client, Void, Exception>() {
@@ -1157,7 +1158,7 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
                             cfToCreate.setId(consistentId);
                             cfToOurCfId.put(cfToCreate, consistentId);
 
-                            log.info("Creating the table with cfId" + consistentId);
+                            log.info("Creating the table with cfId " + consistentId);
                             client.system_add_column_family(cfToCreate);
                         } else {
                             log.warn(String.format("Ignored call to create a table (%s) that already existed (case insensitive).", table));
@@ -1166,17 +1167,16 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
                     if (!tablesToCreate.isEmpty()) {
                         CassandraKeyValueServices.waitForSchemaVersions(client, "(all tables in a call to createTables)", configManager.getConfig().schemaMutationTimeoutMillis());
 
-                        Thread.sleep(5000);
-
                         log.info("Now checking our cfids with the rest of the cluster. We have this many: " + cfToOurCfId.size());
                         for (Entry<CfDef, Integer> cfAndCfId : cfToOurCfId.entrySet()) {
                             String cfName = cfAndCfId.getKey().getName();
-                            int consistentIdAroundCluster = CassandraKeyValueServices.checkCfIdOnAllHosts(clientPool, keyspace, cfName);
-                            log.info("Consistent ID is {}; ours is {}", consistentIdAroundCluster, cfAndCfId.getValue());
-                            if (consistentIdAroundCluster != cfAndCfId.getValue()) {
-                                throw new IllegalStateException("Tried to create a table " + cfName + "; we expected its CfId to be " + cfAndCfId.getValue() +
-                                        " but it looks like someone else created it successfully and fully consistently around the cluster before we did with CfId " + consistentIdAroundCluster);
-                            }
+                            UUID idConsistentOnAllHosts = CassandraKeyValueServices.checkCfIdOnAllHosts(clientPool, keyspace, cfName);
+                            log.info("Found consistent UUID: " + idConsistentOnAllHosts);
+//                            log.info("Consistent ID is {}; ours is {}", consistentIdAroundCluster, cfAndCfId.getValue());
+//                            if (consistentIdAroundCluster != cfAndCfId.getValue()) {
+//                                throw new IllegalStateException("Tried to create a table " + cfName + "; we expected its CfId to be " + cfAndCfId.getValue() +
+//                                        " but it looks like someone else created it successfully and fully consistently around the cluster before we did with CfId " + consistentIdAroundCluster);
+//                            }
                         }
 
                     }
@@ -1188,7 +1188,7 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
         } catch (Exception e) {
             throw Throwables.throwUncheckedException(e);
         } finally {
-            schemaMutationUnlock(lockId);
+//            schemaMutationUnlock(lockId);
         }
 
         internalPutMetadataForTables(tableNamesToTableMetadata, false);

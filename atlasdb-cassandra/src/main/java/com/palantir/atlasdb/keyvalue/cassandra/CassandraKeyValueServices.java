@@ -24,6 +24,8 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.thrift.Cassandra;
 import org.apache.cassandra.thrift.Cassandra.Client;
 import org.apache.cassandra.thrift.CfDef;
@@ -31,6 +33,8 @@ import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.thrift.ColumnOrSuperColumn;
 import org.apache.cassandra.thrift.InvalidRequestException;
 import org.apache.cassandra.thrift.KeySlice;
+import org.apache.cassandra.thrift.KsDef;
+import org.apache.cassandra.thrift.ThriftConversion;
 import org.apache.commons.lang.Validate;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -216,13 +220,22 @@ public class CassandraKeyValueServices {
         return sb.toString();
     }
 
-    public static int checkCfIdOnAllHosts(CassandraClientPool clientPool, String keyspace, String cfName) {
-        FunctionCheckedException<Cassandra.Client, Integer, Exception> getCfId = client -> {
-            List<CfDef> cfDefs = client.describe_keyspace(keyspace).getCf_defs();
+    public static UUID checkCfIdOnAllHosts(CassandraClientPool clientPool, String keyspace, String cfName) {
+        FunctionCheckedException<Cassandra.Client, UUID, Exception> getCfId = client -> {
+            KsDef ksDef = client.describe_keyspace(keyspace);
+            List<CfDef> cfDefs = ksDef.getCf_defs();
             for (CfDef cfDef : cfDefs) {
                 if (cfDef.getName().equals(cfName)) {
-                    log.info("Found the cf {}, its id is {}", cfDef.getName(), cfDef.getId());
-                    return cfDef.getId();
+                    UUID id = Schema.instance.getId(keyspace, cfDef.name);
+                    if (id != null) {
+                        log.info("Found the cf {}, its id is {}", cfDef.getName(), id);
+                        return id;
+                    } else {
+                        CFMetaData cfMetaData = ThriftConversion.fromThrift(cfDef);
+                        UUID cfId = cfMetaData.cfId;
+                        log.info("Hacked into the cf {}, its id is {}", cfDef.getName(), cfId);
+                        return cfId;
+                    }
                 }
             }
             throw new IllegalStateException("Couldn't find the CF we just created (" + cfName + ")");

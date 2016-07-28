@@ -50,10 +50,13 @@ import com.palantir.docker.compose.connection.waiting.SuccessOrFailure;
 public class CassandraTestSuite {
 
     public static final int THRIFT_PORT_NUMBER = 9160;
+    public static final int OTHER_THRIFT_PORT_NUMBER = 9161;
+
     @ClassRule
     public static final DockerComposition composition = DockerComposition.of("src/test/resources/docker-compose.yml")
-            .waitingForHostNetworkedPort(THRIFT_PORT_NUMBER, toBeOpen())
+            .waitingForHostNetworkedPort(OTHER_THRIFT_PORT_NUMBER, toBeOpen())
             .saveLogsTo("container-logs")
+            .skipShutdown(true)
             .build();
 
     static InetSocketAddress CASSANDRA_THRIFT_ADDRESS;
@@ -65,8 +68,13 @@ public class CassandraTestSuite {
         DockerPort port = composition.hostNetworkedPort(THRIFT_PORT_NUMBER);
         CASSANDRA_THRIFT_ADDRESS = new InetSocketAddress(port.getIp(), port.getExternalPort());
 
+        DockerPort otherPort = composition.hostNetworkedPort(OTHER_THRIFT_PORT_NUMBER);
+        InetSocketAddress otherAddress = new InetSocketAddress(otherPort.getIp(), otherPort.getExternalPort());
+
         CASSANDRA_KVS_CONFIG = ImmutableCassandraKeyValueServiceConfig.builder()
-                .addServers(CASSANDRA_THRIFT_ADDRESS)
+                .addServers(
+                        CASSANDRA_THRIFT_ADDRESS,
+                        otherAddress)
                 .poolSize(20)
                 .keyspace("atlasdb")
                 .credentials(ImmutableCassandraCredentialsConfig.builder()

@@ -1,12 +1,59 @@
 version: '2'
 
 services:
+  cassandra_seed:
+     container_name: seed
+     image: com.palantir.docker/atlas-cassandra:2.2-v0.1
+     ports:
+       - 7000:7000
+       - 7001:7001
+       - 7199:7199
+       - 9042:9042
+       - 9160:9160
   cassandra:
     image: com.palantir.docker/atlas-cassandra:2.2-v0.1
     ports:
-      - "9160"
+      - 9161:9160
       - "9042"
       - "7199"
+    links:
+      - cassandra_seed:cassandra_seed
     environment:
+      - CASSANDRA_SEEDS=cassandra_seed
       - LOCAL_JMX=no
-    network_mode: host
+
+#  cass1:
+#    image: poklet/cassandra #com.palantir.docker/atlas-cassandra:2.2-v0.1
+#    ports:
+#      - "9160"
+#      - "9042"
+#      - "7199"
+#    environment:
+#      - ME=cass1
+#      - LOCAL_JMX=no
+#    network_mode: host
+#  cass2:
+#    image: poklet/cassandra #com.palantir.docker/atlas-cassandra:2.2-v0.1
+#    ports:
+#      - "9160"
+#      - "9042"
+#      - "7199"
+#    links:
+#      - cass1:seed
+#    environment:
+#      - ME=cass2
+#      - LOCAL_JMX=no
+#    network_mode: host
+#  cass3:
+#    image: poklet/cassandra #com.palantir.docker/atlas-cassandra:2.2-v0.1
+#    ports:
+#      - "9160"
+#      - "9042"
+#      - "7199"
+#    links:
+#      - cass1:seed
+#    environment:
+#      - ME=cass3
+#      - LOCAL_JMX=no
+#    network_mode: host
+
