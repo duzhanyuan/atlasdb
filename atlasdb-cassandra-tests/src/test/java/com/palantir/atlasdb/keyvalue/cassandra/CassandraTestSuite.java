@@ -51,6 +51,7 @@ public class CassandraTestSuite {
 
     public static final int THRIFT_PORT_NUMBER = 9160;
     public static final int OTHER_THRIFT_PORT_NUMBER = 9161;
+    public static final int ANOTHER_THRIFT_PORT_NUMBER = 9162;
 
     @ClassRule
     public static final DockerComposition composition = DockerComposition.of("src/test/resources/docker-compose.yml")
@@ -71,10 +72,15 @@ public class CassandraTestSuite {
         DockerPort otherPort = composition.hostNetworkedPort(OTHER_THRIFT_PORT_NUMBER);
         InetSocketAddress otherAddress = new InetSocketAddress(otherPort.getIp(), otherPort.getExternalPort());
 
+        DockerPort anotherPort = composition.hostNetworkedPort(ANOTHER_THRIFT_PORT_NUMBER);
+        InetSocketAddress anotherAddress = new InetSocketAddress(anotherPort.getIp(), anotherPort.getExternalPort());
+
+
         CASSANDRA_KVS_CONFIG = ImmutableCassandraKeyValueServiceConfig.builder()
                 .addServers(
                         CASSANDRA_THRIFT_ADDRESS,
-                        otherAddress)
+                        otherAddress,
+                        anotherAddress)
                 .poolSize(20)
                 .keyspace("atlasdb")
                 .credentials(ImmutableCassandraCredentialsConfig.builder()
