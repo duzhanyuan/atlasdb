@@ -20,10 +20,10 @@ services:
     links:
       - cassandra_seed:cassandra_seed
     environment:
-      - CASSANDRA_SEEDS=cassandra_seed
+      - CASSANDRA_SEEDS=cassandra_seed,cassandra_otherseed
       - LOCAL_JMX=no
 
-  cassandra2:
+  cassandra_otherseed:
     container_name: cassandra2
     image: com.palantir.docker/atlas-cassandra:2.2-v0.1
     ports:
@@ -33,7 +33,7 @@ services:
     links:
       - cassandra_seed:cassandra_seed
     environment:
-      - CASSANDRA_SEEDS=cassandra_seed
+      - CASSANDRA_SEEDS=cassandra_seed,cassandra_otherseed
       - LOCAL_JMX=no
 
 
