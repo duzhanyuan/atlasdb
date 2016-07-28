@@ -37,9 +37,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import com.google.common.collect.ImmutableMap;
 import com.palantir.atlasdb.AtlasDbConstants;
 import com.palantir.atlasdb.cassandra.CassandraKeyValueServiceConfigManager;
 import com.palantir.atlasdb.cassandra.ImmutableCassandraKeyValueServiceConfig;
+import com.palantir.atlasdb.encoding.PtBytes;
+import com.palantir.atlasdb.keyvalue.api.Cell;
 import com.palantir.atlasdb.keyvalue.api.TableReference;
 
 abstract public class AbstractCassandraLockTest {
@@ -151,11 +154,13 @@ abstract public class AbstractCassandraLockTest {
             });
         });
 
+        slowTimeoutKvs.put(GOOD_TABLE, ImmutableMap.of(Cell.create(PtBytes.toBytes("row0"), PtBytes.toBytes("col0")), PtBytes.toBytes(42)), 123);
+
         try {
             threadPool.shutdown();
             threadPool.awaitTermination(2L, TimeUnit.MINUTES);
         } finally {
-            slowTimeoutKvs.dropTable(GOOD_TABLE);
+//            slowTimeoutKvs.dropTable(GOOD_TABLE);
             assertThat(successes.get(), is(threadCount));
         }
     }
