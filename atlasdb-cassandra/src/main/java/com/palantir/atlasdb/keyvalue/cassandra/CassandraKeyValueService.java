@@ -1128,14 +1128,18 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
     @Override
     public void createTables(final Map<TableReference, byte[]> tableNamesToTableMetadata) {
         long lockId = waitForSchemaMutationLock();
+        System.out.println("Got lockId " + lockId);
 
         try {
             clientPool.runWithRetry(new FunctionCheckedException<Client, Void, Exception>() {
                 @Override
                 public Void apply(Client client) throws Exception {
-                    KsDef ks = client.describe_keyspace(configManager.getConfig().keyspace());
+                    String keyspace = configManager.getConfig().keyspace();
+
+                    KsDef ks = client.describe_keyspace(keyspace);
                     Set<TableReference> tablesToCreate = tableNamesToTableMetadata.keySet();
                     Set<TableReference> existingTablesLowerCased = Sets.newHashSet();
+                    Map<CfDef, Integer> cfToOurCfId = Maps.newHashMap();
 
                     for (CfDef cf : ks.getCf_defs()) {
                         existingTablesLowerCased.add(fromInternalTableName(cf.getName().toLowerCase()));
@@ -1145,14 +1149,36 @@ public class CassandraKeyValueService extends AbstractKeyValueService {
                         CassandraVerifier.sanityCheckTableName(table);
 
                         TableReference tableRefLowerCased = TableReference.createUnsafe(table.getQualifiedName().toLowerCase());
+                        log.info("Might now create table {}", tableRefLowerCased);
                         if (!existingTablesLowerCased.contains(tableRefLowerCased)) {
-                            client.system_add_column_family(getCfForTable(table, tableNamesToTableMetadata.get(table)));
+                            CfDef cfToCreate = getCfForTable(table, tableNamesToTableMetadata.get(table));
+
+                            int consistentId = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
+                            cfToCreate.setId(consistentId);
+                            cfToOurCfId.put(cfToCreate, consistentId);
+
+                            log.info("Creating the table with cfId" + consistentId);
+                            client.system_add_column_family(cfToCreate);
                         } else {
                             log.warn(String.format("Ignored call to create a table (%s) that already existed (case insensitive).", table));
                         }
                     }
                     if (!tablesToCreate.isEmpty()) {
                         CassandraKeyValueServices.waitForSchemaVersions(client, "(all tables in a call to createTables)", configManager.getConfig().schemaMutationTimeoutMillis());
+
+                        Thread.sleep(5000);
+
+                        log.info("Now checking our cfids with the rest of the cluster. We have this many: " + cfToOurCfId.size());
+                        for (Entry<CfDef, Integer> cfAndCfId : cfToOurCfId.entrySet()) {
+                            String cfName = cfAndCfId.getKey().getName();
+                            int consistentIdAroundCluster = CassandraKeyValueServices.checkCfIdOnAllHosts(clientPool, keyspace, cfName);
+                            log.info("Consistent ID is {}; ours is {}", consistentIdAroundCluster, cfAndCfId.getValue());
+                            if (consistentIdAroundCluster != cfAndCfId.getValue()) {
+                                throw new IllegalStateException("Tried to create a table " + cfName + "; we expected its CfId to be " + cfAndCfId.getValue() +
+                                        " but it looks like someone else created it successfully and fully consistently around the cluster before we did with CfId " + consistentIdAroundCluster);
+                            }
+                        }
+
                     }
                     return null;
                 }

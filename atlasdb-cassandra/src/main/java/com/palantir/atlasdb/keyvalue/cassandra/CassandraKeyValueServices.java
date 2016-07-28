@@ -216,6 +216,21 @@ public class CassandraKeyValueServices {
         return sb.toString();
     }
 
+    public static int checkCfIdOnAllHosts(CassandraClientPool clientPool, String keyspace, String cfName) {
+        FunctionCheckedException<Cassandra.Client, Integer, Exception> getCfId = client -> {
+            List<CfDef> cfDefs = client.describe_keyspace(keyspace).getCf_defs();
+            for (CfDef cfDef : cfDefs) {
+                if (cfDef.getName().equals(cfName)) {
+                    log.info("Found the cf {}, its id is {}", cfDef.getName(), cfDef.getId());
+                    return cfDef.getId();
+                }
+            }
+            throw new IllegalStateException("Couldn't find the CF we just created (" + cfName + ")");
+        };
+
+        return clientPool.runOnAllNodesAndEnsureReturnValuesConsistent(getCfId);
+    }
+
     static interface ThreadSafeResultVisitor extends Visitor<Map<ByteBuffer, List<ColumnOrSuperColumn>>> {
         // marker
     }
