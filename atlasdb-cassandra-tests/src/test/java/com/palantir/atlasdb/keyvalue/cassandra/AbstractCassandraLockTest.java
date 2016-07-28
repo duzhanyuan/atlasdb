@@ -15,6 +15,9 @@
  */
 package com.palantir.atlasdb.keyvalue.cassandra;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -24,11 +27,13 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -69,12 +74,14 @@ abstract public class AbstractCassandraLockTest {
         kvs.teardown();
     }
 
+    @Ignore
     @Test
     public void testLockAndUnlockWithoutContention() {
         long ourId = kvs.waitForSchemaMutationLock();
         kvs.schemaMutationUnlock(ourId);
     }
 
+    @Ignore
     @Test
     public void testOnlyOneLockCanBeLockedAtATime() throws InterruptedException, ExecutionException, TimeoutException {
         long firstLock = kvs.waitForSchemaMutationLock();
@@ -88,6 +95,7 @@ abstract public class AbstractCassandraLockTest {
         kvs.schemaMutationUnlock(firstLock);
     }
 
+    @Ignore
     @Test
     public void testUnlockIsSuccessful() throws InterruptedException, TimeoutException, ExecutionException {
         long id = kvs.waitForSchemaMutationLock();
@@ -101,6 +109,7 @@ abstract public class AbstractCassandraLockTest {
         future.get(3, TimeUnit.SECONDS);
     }
 
+    @Ignore
     @Test (timeout = 10 * 1000)
     public void testTableCreationCanOccurAfterError() {
         try {
@@ -113,23 +122,42 @@ abstract public class AbstractCassandraLockTest {
     }
 
     @Test
-    public void testCreatingMultipleTablesAtOnce() {
-        int threadCount =  16;
+    public void testCreatingTableWorksAfterClockfortsStuff() {
+        TableReference tr = TableReference.createFromFullyQualifiedName("foo.barbaz");
+        try {
+            kvs.createTable(tr, AtlasDbConstants.GENERIC_TABLE_METADATA);
+        } finally {
+            kvs.dropTable(tr);
+        }
+    }
+
+    @Ignore
+    @Test
+    public void testCreatingMultipleTablesAtOnce() throws InterruptedException {
+        int threadCount = 2;
         CyclicBarrier barrier = new CyclicBarrier(threadCount);
         ForkJoinPool threadPool = new ForkJoinPool(threadCount);
 
+        AtomicInteger successes = new AtomicInteger();
         threadPool.submit(() -> {
             IntStream.range(0, threadCount).parallel().forEach(i -> {
                 try {
                     barrier.await();
                     slowTimeoutKvs.createTable(GOOD_TABLE, AtlasDbConstants.GENERIC_TABLE_METADATA);
+                    successes.incrementAndGet();
                 } catch (BrokenBarrierException | InterruptedException e) {
                     // Do nothing
                 }
             });
         });
 
-        slowTimeoutKvs.dropTable(GOOD_TABLE);
+        try {
+            threadPool.shutdown();
+            threadPool.awaitTermination(5L, TimeUnit.MINUTES);
+        } finally {
+            slowTimeoutKvs.dropTable(GOOD_TABLE);
+            assertThat(successes.get(), is(threadCount));
+        }
     }
 
     protected Future async(Runnable callable) {
@@ -147,6 +175,7 @@ abstract public class AbstractCassandraLockTest {
         }
     }
 
+    @Ignore
     @Test
     public void describeVersionBehavesCorrectly() throws Exception {
         kvs.clientPool.runWithRetry(CassandraVerifier.underlyingCassandraClusterSupportsCASOperations);
