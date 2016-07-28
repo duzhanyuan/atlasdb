@@ -1,4 +1,4 @@
-FROM cassandra:2.2.6
+FROM cassandra:2.2.1
 
 ENV CASSANDRA_CONFIG /etc/cassandra
 ENV CASSANDRA_YAML $CASSANDRA_CONFIG/cassandra.yaml
